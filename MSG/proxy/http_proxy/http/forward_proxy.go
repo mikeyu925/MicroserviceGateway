@@ -37,6 +37,8 @@ func (p *Pxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusBadGateway) // 返回错误响应给客户端
 		return
 	}
+	// 关闭连接
+	defer resp.Body.Close()
 	// 3. 处理响应并返回上游客户端
 	// 把下游服务器所有头信息进行拷贝
 	for key, value := range resp.Header {
@@ -46,6 +48,5 @@ func (p *Pxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	rw.WriteHeader(resp.StatusCode)
 	io.Copy(rw, resp.Body)
-	// 关闭连接
-	resp.Body.Close()
+
 }
