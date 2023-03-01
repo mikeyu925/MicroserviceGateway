@@ -8,5 +8,5 @@ func main() {
 		writer.Write([]byte("hello, this is server!"))
 	})
 	// 启动监听并提供服务
-	http.ListenAndServe("127.0.0.1:8080", nil)
+	http.ListenAndServe("127.0.0.1:9527", nil)
 }

@@ -43,5 +43,6 @@ func TestWeightRoundRobin(t *testing.T) {
 		}
 
 		print(rb, addr)
+
 	}
 }
