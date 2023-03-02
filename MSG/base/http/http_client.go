@@ -37,4 +37,5 @@ func main() {
 	// 处理服务器响应
 	bds, _ := io.ReadAll(resp.Body)
 	fmt.Println(string(bds))
+
 }
