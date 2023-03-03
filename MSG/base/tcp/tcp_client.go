@@ -7,7 +7,7 @@ import (
 
 func main() {
 	// 与服务器建立连接
-	conn, err := net.Dial("tcp", "127.0.0.1:3000")
+	conn, err := net.Dial("tcp", "127.0.0.1:8003")
 	if err != nil {
 		fmt.Println("connect failed ! err :", err)
 	}

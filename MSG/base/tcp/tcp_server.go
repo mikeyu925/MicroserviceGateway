@@ -25,4 +25,5 @@ func main() {
 	fmt.Println("get info: ", string(buf[:n]))
 	// 对客户端进行响应
 	conn.Write([]byte("hello client!"))
+
 }

@@ -14,18 +14,6 @@ import (
 )
 
 func main() {
-	realSever := "http://127.0.0.1:8001?ask1=1"
-
-	serverURL, err := url.Parse(realSever)
-	if err != nil {
-		fmt.Println(err)
-	}
-	proxy := NewSingleHostReverseProxy(serverURL)
-
-	// 代理服务器 「采用一台主机的多个端口模仿多个主机」
-	addr := "127.0.0.1:8081"
-	fmt.Println("Starting proxy http server at " + addr)
-	http.ListenAndServe(addr, proxy)
 
 }
 
@@ -58,6 +46,13 @@ func NewSingleHostReverseProxy(target *url.URL) *httputil.ReverseProxy {
 	// 重写修改返回响应内容
 	modifyResponse := func(res *http.Response) error {
 		fmt.Println("Here is modifyResponse function.")
+		if res.StatusCode == http.StatusSwitchingProtocols {
+			if strings.Contains(res.Header.Get("Connection"), "Upgrade") {
+				return nil
+			}
+
+		}
+
 		if res.StatusCode == http.StatusOK {
 			srcBody, err := io.ReadAll(res.Body)
 			if err != nil {
