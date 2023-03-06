@@ -95,7 +95,7 @@
 > - 基于HTTP/2设计,双向流、流控、头部压缩、单TCP多路复用
 > - 面向服务端和移动端：节省空间、省电
 > - 支持众多语言C++、Go、Java、Python
-> - 使用 protobuf 作为IDL
+> - 使用 protobuf 作为IDL「接口定义语言」
 >
 > 基本理念：
 >
@@ -108,6 +108,107 @@
 > 总结：rpc就是像调用本地函数一样嗲用远程函数
 
 <img src="./README.assets/image-20230302154224558.png" alt="image-20230302154224558" style="zoom:50%;" />
+
+
+
+>  Go语言默认rpc序列化方式是gob
+
+`nc -l host:port`：模拟TCP服务器进行监听
+
+---
+
+gPRC服务器和客户端实现
+
+- 编写并编译proto文件「定义了传输数据的格式」，定义服务和消息体 「需要自己定义消息格式」
+
+  > $ protoc --go_out=plugins=grpc:. *.proto
+  >
+  > 一般会生成两个文件
+  >
+  > - xxx.pb.go：和message相关的内容
+  > - xxx_grpc.pb.go：和grpc服务相关的内容
+
+- 注册gRPC服务并启动
+
+  > ```go
+  > // 注册gRPC服务，绑定对象方法
+  > grpcServer := grpc.NewServer()
+  > pb.RegisterHelloServiceServer(grpcServer, &HelloService{})
+  > // 创建设置监听
+  > listener, err := net.Listen("tcp", "127.0.0.1:8004")
+  > if err != nil {
+  >    fmt.Println("listen err!")
+  >    return
+  > }
+  > fmt.Println("listen port 127.0.0.1:8004 ....")
+  > defer listener.Close()
+  > // 绑定服务：将监听绑定rpc服务
+  > grpcServer.Serve(listener)
+  > ```
+
+- 创建客户端远程调用函数
+
+  > ```go
+  > // 使用 gRPC 链接服务器
+  > // 抑制安全策略，不使用TLS层安全握手
+  > grpcConn, err := grpc.Dial("127.0.0.1:8004", grpc.WithTransportCredentials(insecure.NewCredentials()))
+  > 
+  > defer grpcConn.Close()
+  > // 初始化客户端
+  > grpcClient := pb.NewHelloServiceClient(grpcConn)
+  > reply, err := grpcClient.Hello(context.Background(), &pb.Person{Name: "小鱼", Age: 10})
+  > 
+  > fmt.Println("收到回复" + reply.String())
+  > ```
+
+**gprc支持的四种服务方法**：
+
+- 一元 RPC(Unary)，客户端向服务器发送单个请求并返回单个响应，就像普通的函数调用一样
+
+  > rpc SayHello(HelloRequest) returns (HelloResponse);
+
+- 服务器流式处理(Server streaming) RPC，客户端向服务器发送请求并获取流以读回一系列消息
+
+  > rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse);
+  >
+  > 客户端发送一个消息，服务器回复一系列的消息「要保证顺序」
+
+- 客户端流式处理(Client streaming) RPC，客户端写入一系列消息并将其发送到服务器，等待服务器读取并应答
+
+  > rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse);
+  >
+  > 客户端发送一系列消息，服务器回复一个消息
+
+- 双向流式处理(Bidirectional streaming) RPC，其中双方都使用读写流发送一系列消息。两个流独立运行
+
+  > rpc BidiHello(stream HelloRequest) returns (stream HelloResponse);
+  >
+  > 相当于建立了两个管道「独立运行，HTTP2的特点」
+
+---
+
+metadata元数据`map[string][]string 或者 map[string]string`的作用：
+
+- 一般携带token、timestamp、授权信息
+
+```go
+// 服务端
+	// 从上下文拿到元数据
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		// 根据需要进行解析
+		fmt.Println("md : ", md)
+	} else {
+		log.Println("miss metadata from context")
+	}
+```
+
+```go
+// 客户端
+// 封装元数据
+md := metadata.Pairs("timestamp", time.Now().Format(time.StampNano)) // 两个参数为一组
+md.Append("hobby", "fxxk", "make", "love")
+ctx := metadata.NewOutgoingContext(context.Background(), md)
+```
 
 
 
@@ -140,6 +241,8 @@
 
 
 
+### 负载均衡
+
 
 
 
@@ -160,6 +263,16 @@ grpc与http对比，grpc为啥好，基本原理是什么？
 >
 > - 都有类似的机制，例如grpc的metadata机制和http的头机制作用相似，而且web框架，和rpc框架中都有拦截器的概念
 > - grpc是基于http2协议，可以实现多路复用的长连接，效率更高
+
+---
+
+服务端同时接收到两条同样的请求，如何滤除，只执行其中一个「小红书二面」
+
+> 是考拦截器和过滤器吗？
+
+
+
+
 
 ---
 

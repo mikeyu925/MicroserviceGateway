@@ -1,0 +1,15 @@
+syntax = "proto3"; // 指定protocol buffers版本
+
+option go_package = ".;pb"; // 后期生成go文件的包名
+
+
+// 可以看成一个对象「消息体」
+ message Person{
+   string name = 1; // 原则上从1开始，可以看成一个编号。 不能使用 19000-19999
+   int32 age = 2;
+ }
+
+ // 定义一个grpc服务
+ service HelloService{
+    rpc Hello (Person) returns (Person);
+ }

@@ -14,5 +14,11 @@ func main() {
 	}
 	defer conn.Close()
 	// 调用远程函数
-	conn.Call("SayHello")
+	var reply string
+	err = conn.Call("Hello.SayHello", "小鱼", &reply)
+	if err != nil {
+		fmt.Printf("Dial err : ", err)
+		return
+	}
+	fmt.Println(reply)
 }
