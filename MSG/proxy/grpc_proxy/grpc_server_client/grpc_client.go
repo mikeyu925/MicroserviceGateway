@@ -15,7 +15,7 @@ import (
 var msg = "this is client"
 
 func main() {
-	grpcConn, err := grpc.Dial("127.0.0.1:8005", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConn, err := grpc.Dial("127.0.0.1:8085", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		fmt.Printf("Dial err : ", err)
 		return
