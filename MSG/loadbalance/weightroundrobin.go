@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // 加权轮询算法
@@ -13,6 +14,11 @@ type WeightRoundRobinBalance struct {
 	// 当前轮询的结点索引
 	curIndex int
 }
+
+const (
+	MaxFails    int           = 3
+	FailTimeout time.Duration = time.Second * 3
+)
 
 /*
 node 每个服务器结点有不同的权重，并且在每一轮访问后可能会发生变化
@@ -27,6 +33,12 @@ type node struct {
 	currentWeight int
 	// 有效权重，默认与weight相同，每当发生故障时，有效权重-1
 	effectiveWeight int
+	// failTimeout内最大失败次数，如果到达，则在failTimeout内不能再被选择
+	maxFails int
+	// 指定超时到时见「用于衡量最大失败次数，也用于超时」
+	failTimeout time.Duration
+	// 失败的时间结点
+	failTimes []time.Time // 类似一个滑动窗口
 }
 
 /*
@@ -53,6 +65,8 @@ func (r *WeightRoundRobinBalance) Add(params ...string) error {
 			weight:          int(weight),
 			currentWeight:   0,
 			effectiveWeight: int(weight),
+			maxFails:        MaxFails,
+			failTimeout:     FailTimeout,
 		}
 		r.servAddrs = append(r.servAddrs, &n)
 	}
@@ -60,8 +74,10 @@ func (r *WeightRoundRobinBalance) Add(params ...string) error {
 }
 
 // 找到权重最大的下一个服务器
-/**
+/*
+
 为了避免每次都访问同一个服务器，每一轮选中之后，需要对其进行降权
+
 */
 func (r *WeightRoundRobinBalance) Next() (string, error) {
 	lens := len(r.servAddrs)
@@ -76,6 +92,14 @@ func (r *WeightRoundRobinBalance) Next() (string, error) {
 	for i, servNode := range r.servAddrs {
 		// 计算每个服务器的权重: 临时权重 + 有效权重  「选中最大的临时权重结点」
 		servNode.currentWeight += servNode.effectiveWeight
+		if servNode.maxFails <= 0 { // 不能被选中
+			refreshErrRecords(servNode)
+			servNode.maxFails = MaxFails - len(servNode.failTimes)
+			if servNode.maxFails <= 0 {
+				fmt.Println(servNode.addr, " 进入小黑屋！")
+				continue
+			}
+		}
 		if maxNode == nil || servNode.currentWeight > maxNode.currentWeight {
 			maxNode = servNode
 			index = i
@@ -98,12 +122,27 @@ func (r *WeightRoundRobinBalance) CallBack(addr string, flag bool) {
 				if w.effectiveWeight < w.weight {
 					w.effectiveWeight++
 				}
-			} else {
+			} else { // 访问服务器失败
 				w.effectiveWeight--
+				// 刷新错误时间表
+				refreshErrRecords(w)
+				// 添加当前错误时间点
+				w.failTimes = append(w.failTimes, time.Now())
+				// 更新时间段内错误次数
+				w.maxFails = MaxFails - len(w.failTimes)
 			}
 			break
 		}
 	}
+}
+
+func refreshErrRecords(w *node) {
+	now := time.Now()
+	var i = 0
+	for len(w.failTimes) > i && now.Sub(w.failTimes[i]) >= w.failTimeout {
+		i += 1
+	}
+	w.failTimes = w.failTimes[i:]
 }
 
 func print(rb *WeightRoundRobinBalance, addr string) {
