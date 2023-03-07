@@ -61,3 +61,31 @@ func TestRandomRoundRobin(t *testing.T) {
 		fmt.Println(rb.Next())
 	}
 }
+
+func TestConsistentHashRoundRobin(t *testing.T) {
+	rb := NewConsistentHashBalance(2, nil)
+	rb.Add("127.0.0.1:8000")
+	rb.Add("127.0.0.1:8001")
+	rb.Add("127.0.0.1:8002")
+	rb.Add("127.0.0.1:8003")
+	rb.Add("127.0.0.1:8004")
+	rb.Add("127.0.0.1:8005")
+	fmt.Println(rb.hashKeys)
+	fmt.Println(rb.Get("http://127.0.0.1:8002/demo/get"))
+	fmt.Println(rb.Get("http://127.0.0.1:8003/demo/get"))
+	fmt.Println(rb.Get("http://127.0.0.1:8002/demo/get"))
+	fmt.Println(rb.Get("http://127.0.0.1:8003/demo/put"))
+	fmt.Println(rb.Get("http://127.0.0.1:8001/demo/get"))
+
+	//
+	fmt.Println("---------------")
+	fmt.Println(rb.Get("127.0.0.1:8002"))
+	fmt.Println(rb.Get("127.0.0.1:8001"))
+	fmt.Println(rb.Get("127.0.0.1:8002"))
+	fmt.Println(rb.Get("127.0.0.1:8003"))
+	fmt.Println(rb.Get("127.0.0.1:8004"))
+	fmt.Println(rb.Get("127.0.0.1:8005"))
+	fmt.Println(rb.Get("127.0.0.1:8008"))
+	fmt.Println(rb.Get("127.0.0.1:8004"))
+
+}
