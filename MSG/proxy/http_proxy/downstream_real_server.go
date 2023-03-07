@@ -12,6 +12,8 @@ import (
 func main() {
 	server1 := RealServer{"127.0.0.1:8001"}
 	server1.Run()
+	server2 := RealServer{"127.0.0.1:8002"}
+	server2.Run()
 
 	waitChan := make(chan os.Signal)
 	signal.Notify(waitChan, syscall.SIGINT, syscall.SIGTERM) // 监听系统的关闭信号 Ctrl + C 或者 Kill

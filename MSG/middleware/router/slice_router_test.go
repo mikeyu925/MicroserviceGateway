@@ -1,9 +1,12 @@
 package router
 
 import (
+	"MSG/proxy"
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -23,10 +26,11 @@ func TestSliceRouter(t *testing.T) {
 	sliceRouter := NewSliceRouter()
 	routeRoot := sliceRouter.Group("/")
 	routeRoot.Use(middleware_hello, func(context *SliceRouteContext) {
-		fmt.Println("11111111")
+		fmt.Println("reverse proxy")
+		reverseProxy(context.Ctx).ServeHTTP(context.Rw, context.Req)
 	})
 
-	var routerHandler http.Handler = NewSliceRouterHandler(uerDefineMiddleware, sliceRouter)
+	var routerHandler http.Handler = NewSliceRouterHandler(nil, sliceRouter)
 	http.ListenAndServe(addr, routerHandler)
 }
 
@@ -36,13 +40,19 @@ func middleware_hello(sc *SliceRouteContext) {
 	fmt.Println("GoodBye!")
 }
 
-func uerDefineMiddleware(sc *SliceRouteContext) http.Handler {
-	return &userDefineHandler{}
-}
+func reverseProxy(c context.Context) http.Handler {
+	rs1 := "http://127.0.0.1:8001/"
+	url1, err1 := url.Parse(rs1)
+	if err1 != nil {
+		log.Println(err1)
+	}
 
-type userDefineHandler struct {
-}
+	rs2 := "http://127.0.0.1:8002/haha"
+	url2, err2 := url.Parse(rs2)
+	if err2 != nil {
+		log.Println(err2)
+	}
 
-func (uh *userDefineHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	rw.Write([]byte("heooooooooo"))
+	urls := []*url.URL{url1, url2}
+	return proxy.NewMultipleHostsReverseProxy(c, urls)
 }
