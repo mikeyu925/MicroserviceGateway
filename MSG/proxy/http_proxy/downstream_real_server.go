@@ -1,7 +1,9 @@
 package main
 
 import (
+	"MSG/middleware/servicediscovery/zookeeper"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,6 +27,10 @@ type RealServer struct {
 	Addr string // 服务器主机地址 ip:port
 }
 
+const (
+	RegisterAddr string = "192.168.153.132:2181"
+)
+
 func (r *RealServer) Run() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/realserver", r.HelloHandler)
@@ -35,7 +41,18 @@ func (r *RealServer) Run() {
 		WriteTimeout: time.Second * 3,
 	}
 	go func() {
-		server.ListenAndServe()
+		// 将服务注册到注册中心
+		zkManager := zookeeper.NewZkManager([]string{""})
+		err := zkManager.GetConnect()
+		if err != nil {
+			fmt.Sprintf("connect zookeeper eror : %v", err.Error())
+		}
+		defer zkManager.Close()
+		err = zkManager.RegisterServerPath("/realserver", fmt.Sprintf(r.Addr))
+		if err != nil {
+			fmt.Println("register node error : ", err.Error())
+		}
+		log.Fatal(server.ListenAndServe())
 	}()
 }
 

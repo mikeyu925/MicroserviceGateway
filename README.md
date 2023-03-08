@@ -517,6 +517,174 @@ hash：
 >
 > 解决扩容/宕机时路由的大规模变化问题「扩容/宕机只会影响部分对象」，缓解分布式缓存大范围失效问题
 
+
+
+### 中间件开发
+
+#### 中间件
+
+<img src="./README.assets/image-20230307140549048.png" alt="image-20230307140549048" style="zoom:50%;" />
+
+> 类似一个栈结构
+
+什么是中间件？
+
+> 处于各部件之间，是一个为应用提供服务的软件
+>
+> 提高复用，隔离业务
+>
+> 调用清晰，组合随意
+>
+> 权限、日志、流量、缓存、路由
+>
+> 构建中间件到路由上：
+>
+> - 基于数组构建中间件
+> - 基于链表构建中间件
+>
+> 中间件的本质：一些列的函数，按照一定的顺序执行
+
+
+
+#### 限流器
+
+**高并发三大利器：缓存、降级、限流**
+
+- 缓存：提升系统访问速度和增大处理容量，为相关业务增加缓存「将热点数据加载到Redis」
+
+- 降级：当服务器压力剧增，根据业务策略降级，以释放服务资源保障业务正常「对部分请求进行降级，进行其他的处理方式」
+
+- 限流：通过对并发限速，以达到拒绝服务、排队或等待、降级等处理
+
+  - 漏桶限流：每次请求计算桶流量，超过阈值则降级请求
+
+    > 保护其他系统用漏桶
+
+  - 令牌桶限流：每次请求从令牌桶获取令牌「token」，取不到则降级请求
+
+    > 令牌桶可以处理数量剧增的突发请求，用于保护自己服务器的系统
+
+    > 很像信号量机制，预先放置一些资源「令牌」，如果能够取得令牌，则可以正常请求，否则降级
+
+<img src="./README.assets/image-20230307204416095.png" alt="image-20230307204416095" style="zoom:50%;" />
+
+
+
+使用Golang组件实现限流器：
+
+
+
+#### 熔断器
+
+熔断：当依赖的服务出现故障，为保证自身服务正常运行不再访问依赖服务，防止雪崩效应 
+
+降级：当服务器压力剧增，根据业务策略降级以释放服务资源，保障业务正常
+
+熔断器：
+
+- 关闭状态：服务正常，统计失败率，达到阈值开启
+- 开启状态：服务异常，执行降级
+- 半开启状态：尝试恢复服务。失败率高于阈值-开启；低于阈值-关闭
+
+<img src="./README.assets/image-20230308101637182.png" alt="image-20230308101637182" style="zoom:50%;" />
+
+基于hystrix库实现熔断器：
+
+```go
+// 配置一个熔断器
+func TestHystrix(t *testing.T) {
+	var hystrixName = "hystrixName"
+	hystrix.ConfigureCommand(hystrixName, hystrix.CommandConfig{
+		Timeout:                1000,
+		MaxConcurrentRequests:  1,
+		SleepWindow:            5000,
+		RequestVolumeThreshold: 1,
+		ErrorPercentThreshold:  1,
+	})
+
+	for i := 0; i < 10000; i++ {
+		// 异步调用 Go()
+		// 同步调用 Do()
+		err := hystrix.Do(hystrixName, func() error { // 业务逻辑
+			// 错误测试
+			if i == 0 {
+				return errors.New("service error : " + strconv.Itoa(i))
+			}
+			log.Println("do service: " + strconv.Itoa(i))
+			return nil
+		}, func(err error) error { // 降级方法
+			fmt.Println("here is plan B!")
+			return errors.New("fallback err:" + err.Error())
+		})
+		if err != nil {
+			log.Println("hystrix err: " + err.Error())
+			time.Sleep(time.Second)
+			log.Println("sleep 1 second", i)
+		}
+	}
+}
+```
+
+
+
+#### 服务注册与发现
+
+什么是服务发现？
+
+> 用注册中心来记录服务信息，以便其他服务快速找到已注册服务
+>
+>  
+
+- 客户端服务发现
+
+  <img src="./README.assets/image-20230308113404579.png" alt="image-20230308113404579" style="zoom:50%;" />
+
+  > 下游服务信息「一个列表」都已经配置好，通过心跳检测「如果收到回复」，则说明服务器是在线的「可以进行服务」，然后将可用下游服务器信息返回给负载均衡进行负载均衡算法选择主机
+
+  <img src="./README.assets/image-20230308113835909.png" alt="image-20230308113835909" style="zoom:50%;" />
+
+- 服务端服务发现
+
+  <img src="./README.assets/image-20230308113850519.png" alt="image-20230308113850519" style="zoom:50%;" />
+
+  > 注册中心相当于一个动态数据库，每当一个下游结点主动注册自己的信息至注册中心
+
+  <img src="./README.assets/image-20230308113453875.png" alt="image-20230308113453875" style="zoom:50%;" />
+
+
+
+
+
+
+
+使用zookeeper作为注册中心
+
+> 是一个分布式数据库. 树形结构「多叉树」
+>
+> 树形结构结点：
+>
+> - 持久：一直存在服务器上
+> - 临时：会话失效则清理
+> - 有序：创建时自动分配序号
+>
+> 监听-通知机制：通过监听获取消息事件「监听子结点、监听服务器内容」，也叫发布-订阅者模式
+
+
+
+基于发布-订阅者模式实现「服务注册与发现」
+
+> 是一对多的依赖关系，当一个目标对象的状态发生改变时，所有依赖于它的对象都得到通知并被自动更新
+
+
+
+
+
+
+
+
+
+
+
 ### 相关面试题整理
 
 ---
