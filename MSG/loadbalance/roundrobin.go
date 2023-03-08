@@ -1,6 +1,9 @@
 package loadbalance
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 // 轮询算法
 type RoundRobinBalance struct {
@@ -8,6 +11,8 @@ type RoundRobinBalance struct {
 	servAddrs []string
 	// 当前轮询的结点索引
 	curIndex int
+
+	conf LoadBalanceConf
 }
 
 func (r *RoundRobinBalance) Add(params ...string) error {
@@ -28,4 +33,21 @@ func (r *RoundRobinBalance) Next() string {
 	addr := r.servAddrs[r.curIndex]
 	r.curIndex = (r.curIndex + 1) % lens
 	return addr
+}
+
+func (c *RoundRobinBalance) Update() {
+	if conf, ok := c.conf.(*LoadBalanceZkConf); ok {
+		c.servAddrs = []string{}
+		for _, ip := range conf.GetConf() {
+			c.Add(strings.Split(ip, ",")...)
+		}
+	}
+}
+
+func (c *RoundRobinBalance) SetConf(conf LoadBalanceConf) {
+
+}
+
+func (c *RoundRobinBalance) Get(s string) (string, error) {
+	return c.Next(), nil
 }

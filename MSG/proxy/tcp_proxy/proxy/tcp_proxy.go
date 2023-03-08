@@ -1,4 +1,4 @@
-package proxy
+package tcp_proxy
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 )
 
 type TCPReverseProxy struct {
-	// 下游真实服务器地址 host:port
-	Addr string
+	Addr string          // 下游真实服务器地址 host:port
+	Ctx  context.Context // 上下文
 
 	DialTimeout     time.Duration // 拨号超时时间 持续时间
 	Deadline        time.Duration // 拨号截止时间 截止时间
@@ -18,6 +18,9 @@ type TCPReverseProxy struct {
 
 	// 拨号器 支持自定义：拨号成功，返回连接；拨号失败，返回error
 	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// TCP 整合负载均衡算法
+	Director func(remoteAddr string) (string, error)
 
 	// 修改响应  从连接里拿数据 「如果返回错误，则由ErrHandler处理」
 	ModifyResponse func(conn net.Conn) error
@@ -59,6 +62,10 @@ func (tpxy *TCPReverseProxy) ServerTCP(src net.Conn, ctx context.Context) {
 			KeepAlive: tpxy.KeepAlivePeriod,
 		}).DialContext
 	}
+
+	// 执行入口函数
+	tpxy.Director(src.RemoteAddr().String())
+
 	// 向下游发送请求
 	dst, err := tpxy.DialContext(ctx, "tcp", tpxy.Addr)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,8 @@ type WeightRoundRobinBalance struct {
 	servAddrs []*node
 	// 当前轮询的结点索引
 	curIndex int
+
+	conf LoadBalanceConf
 }
 
 const (
@@ -79,6 +82,7 @@ func (r *WeightRoundRobinBalance) Add(params ...string) error {
 为了避免每次都访问同一个服务器，每一轮选中之后，需要对其进行降权
 
 */
+
 func (r *WeightRoundRobinBalance) Next() (string, error) {
 	lens := len(r.servAddrs)
 	if lens == 0 {
@@ -163,4 +167,21 @@ func print(rb *WeightRoundRobinBalance, addr string) {
 		fmt.Println(str)
 	}
 	fmt.Println("有效权重之和:\t\t\t\t" + strconv.Itoa(total))
+}
+
+func (c *WeightRoundRobinBalance) Update() {
+	if conf, ok := c.conf.(*LoadBalanceZkConf); ok {
+		c.servAddrs = nil
+		for _, ip := range conf.GetConf() {
+			c.Add(strings.Split(ip, ",")...)
+		}
+	}
+}
+
+func (c *WeightRoundRobinBalance) SetConf(conf LoadBalanceConf) {
+
+}
+
+func (c *WeightRoundRobinBalance) Get(s string) (string, error) {
+	return c.Next()
 }

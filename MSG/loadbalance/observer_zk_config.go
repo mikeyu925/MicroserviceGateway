@@ -1,4 +1,4 @@
-package servicediscovery
+package loadbalance
 
 import (
 	"MSG/middleware/servicediscovery/zookeeper"

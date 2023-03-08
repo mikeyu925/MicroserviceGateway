@@ -5,6 +5,7 @@ import (
 	"hash/crc32"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -24,6 +25,9 @@ type ConsistentHashBalance struct {
 	// 虚拟结点倍数
 	// 解决平衡性问题
 	replicas int
+
+	// 观察主体
+	conf LoadBalanceConf
 
 	// 由于是并发的，map不支持并发，因此需要加锁
 	mux sync.RWMutex
@@ -99,6 +103,19 @@ func (c *ConsistentHashBalance) Get(key string) (string, error) {
 	if idx == l { // 查找结果大于服务器结点的最大索引
 		idx = 0
 	}
-
 	return c.hashMap[c.hashKeys[idx]], nil
+}
+
+func (c *ConsistentHashBalance) Update() {
+	if conf, ok := c.conf.(*LoadBalanceZkConf); ok {
+		c.hashKeys = nil
+		c.hashMap = nil
+		for _, ip := range conf.GetConf() {
+			c.Add(strings.Split(ip, ",")...)
+		}
+	}
+}
+
+func (c *ConsistentHashBalance) SetConf(conf LoadBalanceConf) {
+
 }

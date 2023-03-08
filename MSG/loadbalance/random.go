@@ -3,12 +3,15 @@ package loadbalance
 import (
 	"errors"
 	"math/rand"
+	"strings"
 )
 
 // 轮询算法
 type RandomBalance struct {
 	// 服务器主机地址
 	servAddrs []string
+
+	conf LoadBalanceConf
 }
 
 func (r *RandomBalance) Add(params ...string) error {
@@ -27,4 +30,21 @@ func (r *RandomBalance) Next() string {
 		return ""
 	}
 	return r.servAddrs[rand.Intn(len(r.servAddrs))]
+}
+
+func (c *RandomBalance) Update() {
+	if conf, ok := c.conf.(*LoadBalanceZkConf); ok {
+		c.servAddrs = []string{}
+		for _, ip := range conf.GetConf() {
+			c.Add(strings.Split(ip, ",")...)
+		}
+	}
+}
+
+func (c *RandomBalance) SetConf(conf LoadBalanceConf) {
+
+}
+
+func (c *RandomBalance) Get(s string) (string, error) {
+	return c.Next(), nil
 }
